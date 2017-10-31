@@ -16,7 +16,7 @@ const (
 	_SIZE_1G  = 1024 * 1024 * 1024
 	_SIZE_1T  = 1024 * _SIZE_1G
 
-	_MAX_MMAP_SIZE = _SIZE_1T
+	_MAX_MAP_SIZE = _SIZE_1T
 )
 
 var (
@@ -30,8 +30,8 @@ type DB struct {
 	readOnly bool
 	pageSize int
 
-	data     *[]byte
 	dataref  []byte
+	data     *[_MAX_MAP_SIZE]byte
 	dataSize int
 
 	meta *meta

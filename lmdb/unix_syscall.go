@@ -3,6 +3,7 @@ package lmdb
 import (
 	"syscall"
 	"time"
+	"unsafe"
 )
 
 func flock(db *DB, timeout time.Duration) (err error) {
@@ -38,7 +39,7 @@ func mmap(db *DB, size int) (err error) {
 	}
 
 	db.dataref = b
-	db.data = &b
+	db.data = (*[_MAX_MAP_SIZE]byte)(unsafe.Pointer(&b[0]))
 	db.dataSize = size
 
 	return
