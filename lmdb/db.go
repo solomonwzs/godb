@@ -7,22 +7,6 @@ import (
 	"unsafe"
 )
 
-const (
-	_VERSION = 1
-
-	_INITIAL_MMAP_SIZE = 0
-
-	_SIZE_32K = 32 * 1024
-	_SIZE_1G  = 1024 * 1024 * 1024
-	_SIZE_1T  = 1024 * _SIZE_1G
-
-	_MAX_MAP_SIZE = _SIZE_1T
-)
-
-var (
-	_PAGE_SIZE int = os.Getpagesize()
-)
-
 type DB struct {
 	path     string
 	file     *os.File
@@ -34,7 +18,8 @@ type DB struct {
 	data     *[_MAX_MAP_SIZE]byte
 	dataSize int
 
-	meta *meta
+	meta0 *meta
+	meta1 *meta
 
 	mmapLock sync.RWMutex
 }
@@ -84,7 +69,7 @@ func Open(path string, opt *Options) (db *DB, err error) {
 			return
 		}
 
-		m := db.getPageFromBuffer(buf, _PGID_META).getMeta()
+		m := db.getPageFromBuffer(buf, _PGID_META_0).getMeta()
 		if err = m.validate(); err != nil {
 			return
 		}
@@ -100,13 +85,19 @@ func Open(path string, opt *Options) (db *DB, err error) {
 
 func (db *DB) init() (err error) {
 	db.pageSize = os.Getpagesize()
-	buf := make([]byte, db.pageSize*3)
+	buf := make([]byte, db.pageSize*4)
 
-	p := db.getPageFromBuffer(buf, _PGID_META)
-	p.id = _PGID_META
+	p := db.getPageFromBuffer(buf, _PGID_META_0)
+	p.id = _PGID_META_0
 	p.flags = _PFLAG_META
-	m := p.getMeta()
-	m.init(uint32(db.pageSize))
+	db.meta0 = p.getMeta()
+	db.meta0.init(uint32(db.pageSize))
+
+	p = db.getPageFromBuffer(buf, _PGID_META_1)
+	p.id = _PGID_META_1
+	p.flags = _PFLAG_META
+	db.meta1 = p.getMeta()
+	db.meta1.init(uint32(db.pageSize))
 
 	p = db.getPageFromBuffer(buf, _PGID_FREELIST)
 	p.id = _PGID_FREELIST
@@ -174,7 +165,7 @@ func (db *DB) mmap() (err error) {
 		return err
 	}
 
-	m := db.getPage(_PGID_META).getMeta()
+	m := db.getPage(_PGID_META_0).getMeta()
 	if err = m.validate(); err != nil {
 		return
 	}

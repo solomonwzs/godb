@@ -6,7 +6,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-	"unsafe"
 
 	"github.com/boltdb/bolt"
 )
@@ -31,47 +30,69 @@ func TestBolt(t *testing.T) {
 	}
 	defer db.Close()
 
+	path := db.Path()
+	fd, _ := os.OpenFile(path, os.O_RDONLY, 0666)
+	defer func() {
+		fd.Close()
+		// os.Remove(path)
+	}()
+
+	bucketName := []byte("bucket")
 	if err := db.Update(func(tx *bolt.Tx) error {
-		_, err := tx.CreateBucket([]byte("widgets"))
-		if err != nil {
-			t.Fatal(err)
+		b := tx.Bucket(bucketName)
+		if b == nil {
+			if b, err = tx.CreateBucket(bucketName); err != nil {
+				t.Fatal(err)
+			}
 		}
+
+		for i := 0; i < 64; i++ {
+			key := []byte(fmt.Sprintf("\x02\x04\x08-%d", i))
+			valueSize := 3 * 1024
+			value := make([]byte, valueSize)
+			b.Put(key, value)
+		}
+
 		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
+	info, _ := fd.Stat()
+	fmt.Printf("%+v\n", info.Size())
 }
 
-func TestMmap(t *testing.T) {
-	const n = 1e3
-	s := int(unsafe.Sizeof(0)) * n
-
+func _TestMmap(t *testing.T) {
 	map_file, err := os.Create("/tmp/test3")
-	// map_file, err := os.OpenFile("/tmp/test1", os.O_RDWR, 0666)
+	// map_file, err := os.OpenFile("/tmp/test2", os.O_RDWR, 0666)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	info, _ := map_file.Stat()
+	sz := int(info.Size())
 
-	mmap, err := syscall.Mmap(int(map_file.Fd()), 0, 10,
+	mmap, err := syscall.Mmap(int(map_file.Fd()), 0, sz,
 		syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	_, err = map_file.Seek(int64(s-1), 0)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	_, err = map_file.Write([]byte(" "))
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
 
-	map_array := (*[n]int)(unsafe.Pointer(&mmap[0]))
-	fmt.Println(map_array[:100])
+	// _, err = map_file.Seek(int64(s-1), 0)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	os.Exit(1)
+	// }
+	// _, err = map_file.Write([]byte(" "))
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	os.Exit(1)
+	// }
+
+	// map_array := (*[sz]int)(unsafe.Pointer(&mmap[0]))
+	page := 4
+	pageSize := 4096
+	fmt.Println(mmap[page*pageSize : (page+1)*pageSize])
 
 	// for i := 0; i < n; i++ {
 	// 	map_array[i] = i * i

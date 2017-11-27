@@ -5,10 +5,6 @@ import (
 	"unsafe"
 )
 
-const (
-	_META_CONTENT_SIZE = unsafe.Offsetof(meta{}.crc32)
-)
-
 type meta struct {
 	version    uint32
 	pageSize   uint32
