@@ -31,10 +31,6 @@ type Options struct {
 }
 
 func Open(path string, opt *Options) (db *DB, err error) {
-	var (
-		info os.FileInfo
-	)
-
 	db = &DB{
 		path:   path,
 		file:   nil,
@@ -57,6 +53,7 @@ func Open(path string, opt *Options) (db *DB, err error) {
 		return
 	}
 
+	var info os.FileInfo
 	if info, err = db.file.Stat(); err != nil {
 		return
 	} else if info.Size() == 0 {
@@ -64,13 +61,14 @@ func Open(path string, opt *Options) (db *DB, err error) {
 			return
 		}
 	} else {
-		buf := make([]byte, _PAGE_SIZE)
+		buf := make([]byte, _PAGE_SIZE*2)
 		if _, err = db.file.ReadAt(buf, 0); err != nil {
 			return
 		}
 
-		m := db.getPageFromBuffer(buf, _PGID_META_0).getMeta()
+		m := db.getPageFromBytes(buf, 0).getMeta()
 		if err = m.validate(); err != nil {
+			db.close()
 			return
 		}
 		db.pageSize = int(m.pageSize)
@@ -87,25 +85,30 @@ func (db *DB) init() (err error) {
 	db.pageSize = os.Getpagesize()
 	buf := make([]byte, db.pageSize*4)
 
-	p := db.getPageFromBuffer(buf, _PGID_META_0)
-	p.id = _PGID_META_0
-	p.flags = _PFLAG_META
-	db.meta0 = p.getMeta()
-	db.meta0.init(uint32(db.pageSize))
+	for i := pageid(0); i < 2; i++ {
+		p := db.getPageFromBytes(buf, i)
+		p.pgid = i
+		p.flags = _PAGE_FLAG_META
 
-	p = db.getPageFromBuffer(buf, _PGID_META_1)
-	p.id = _PGID_META_1
-	p.flags = _PFLAG_META
-	db.meta1 = p.getMeta()
-	db.meta1.init(uint32(db.pageSize))
+		m := p.getMeta()
+		m.version = _VERSION
+		m.pageSize = uint32(db.pageSize)
+		m.freelistId = 2
+		m.tid = txid(i)
+		m.root = 3
 
-	p = db.getPageFromBuffer(buf, _PGID_FREELIST)
-	p.id = _PGID_FREELIST
-	p.flags = _PFLAG_FREELIST
+		m.crc32 = m.checksum()
+	}
 
-	p = db.getPageFromBuffer(buf, _PGID_LEAF)
-	p.id = _PGID_LEAF
-	p.flags = _PFLAG_LEAF
+	p := db.getPageFromBytes(buf, 2)
+	p.pgid = 2
+	p.count = 0
+	p.flags = _PAGE_FLAG_FREELIST
+
+	p = db.getPageFromBytes(buf, 3)
+	p.pgid = 3
+	p.count = 0
+	p.flags = _PAGE_FLAG_LEAF
 
 	if _, err = db.file.Write(buf); err != nil {
 		return
@@ -140,7 +143,7 @@ func (db *DB) close() (err error) {
 	return
 }
 
-func (db *DB) getPageFromBuffer(b []byte, id pageid) *page {
+func (db *DB) getPageFromBytes(b []byte, id pageid) *page {
 	return (*page)(unsafe.Pointer(&b[int(id)*db.pageSize]))
 }
 
@@ -165,8 +168,13 @@ func (db *DB) mmap() (err error) {
 		return err
 	}
 
-	m := db.getPage(_PGID_META_0).getMeta()
-	if err = m.validate(); err != nil {
+	db.meta0 = db.getPage(0).getMeta()
+	db.meta1 = db.getPage(1).getMeta()
+
+	if err = db.meta0.validate(); err != nil {
+		return
+	}
+	if err = db.meta1.validate(); err != nil {
 		return
 	}
 
@@ -174,7 +182,7 @@ func (db *DB) mmap() (err error) {
 }
 
 func (db *DB) getPage(pgid pageid) *page {
-	return (*page)(unsafe.Pointer(&db.dataref[int(pgid)*db.pageSize]))
+	return (*page)(unsafe.Pointer(&db.data[int(pgid)*db.pageSize]))
 }
 
 func determineMmapSize(size int, pageSize int) (newSize int) {

@@ -6,8 +6,6 @@ import (
 	"syscall"
 	"testing"
 	"time"
-
-	"github.com/boltdb/bolt"
 )
 
 func TestBase(t *testing.T) {
@@ -23,89 +21,32 @@ func TestBase(t *testing.T) {
 	}
 }
 
-func TestBolt(t *testing.T) {
-	db, err := bolt.Open("/tmp/test2", 0666, nil)
+func TestMMAP(t *testing.T) {
+	path := "/tmp/test-mmap"
+	mapFile, err := os.Create(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
-
-	path := db.Path()
-	fd, _ := os.OpenFile(path, os.O_RDONLY, 0666)
 	defer func() {
-		fd.Close()
-		// os.Remove(path)
+		mapFile.Close()
+		os.Remove(path)
 	}()
 
-	bucketName := []byte("bucket")
-	if err := db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(bucketName)
-		if b == nil {
-			if b, err = tx.CreateBucket(bucketName); err != nil {
-				t.Fatal(err)
-			}
-		}
-
-		for i := 0; i < 64; i++ {
-			key := []byte(fmt.Sprintf("\x02\x04\x08-%d", i))
-			valueSize := 3 * 1024
-			value := make([]byte, valueSize)
-			b.Put(key, value)
-		}
-
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-	info, _ := fd.Stat()
-	fmt.Printf("%+v\n", info.Size())
-}
-
-func _TestMmap(t *testing.T) {
-	map_file, err := os.Create("/tmp/test3")
-	// map_file, err := os.OpenFile("/tmp/test2", os.O_RDWR, 0666)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	info, _ := map_file.Stat()
-	sz := int(info.Size())
-
-	mmap, err := syscall.Mmap(int(map_file.Fd()), 0, sz,
+	size := 64
+	mmap, err := syscall.Mmap(int(mapFile.Fd()), 0, size,
 		syscall.PROT_READ|syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		t.Fatal(err)
 	}
 
-	// _, err = map_file.Seek(int64(s-1), 0)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	os.Exit(1)
-	// }
-	// _, err = map_file.Write([]byte(" "))
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	os.Exit(1)
-	// }
+	_, err = mapFile.Seek(int64(size-1), 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = mapFile.Write([]byte{0x00})
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	// map_array := (*[sz]int)(unsafe.Pointer(&mmap[0]))
-	page := 4
-	pageSize := 4096
-	fmt.Println(mmap[page*pageSize : (page+1)*pageSize])
-
-	// for i := 0; i < n; i++ {
-	// 	map_array[i] = i * i
-	// }
-
-	// err = syscall.Munmap(mmap)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	os.Exit(1)
-	// }
-	// err = map_file.Close()
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	os.Exit(1)
-	// }
+	fmt.Println(mmap)
 }
