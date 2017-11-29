@@ -21,6 +21,7 @@ type DB struct {
 	meta0 *meta
 	meta1 *meta
 
+	metaLock sync.Mutex
 	mmapLock sync.RWMutex
 }
 
@@ -103,11 +104,13 @@ func (db *DB) init() (err error) {
 	p := db.getPageFromBytes(buf, 2)
 	p.pgid = 2
 	p.count = 0
+	p.overflow = 0
 	p.flags = _PAGE_FLAG_FREELIST
 
 	p = db.getPageFromBytes(buf, 3)
 	p.pgid = 3
 	p.count = 0
+	p.overflow = 0
 	p.flags = _PAGE_FLAG_LEAF
 
 	if _, err = db.file.Write(buf); err != nil {

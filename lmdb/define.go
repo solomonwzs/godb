@@ -23,6 +23,8 @@ const (
 	_MAX_ALLOC_SIZE = 2 * _SIZE_1G
 
 	_META_CONTENT_SIZE = unsafe.Offsetof(meta{}.crc32)
+
+	_MAX_ELEMENT_COUNT = 0xffffffff
 )
 
 var (
