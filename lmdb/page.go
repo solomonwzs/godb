@@ -14,7 +14,7 @@ const (
 	_LEAF_ELEM_SIZE   = int(unsafe.Sizeof(leafElem{}))
 	_BRANCH_ELEM_SIZE = int(unsafe.Sizeof(branchElem{}))
 
-	_MAX_NODE_COUNT = 0xffff
+	_MAX_ELEMENT_COUNT = 0xffff
 )
 
 type pageid uint64

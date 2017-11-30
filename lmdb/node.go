@@ -76,7 +76,7 @@ func (n *node) writeTo(p *page) (err error) {
 	}
 
 	count := len(n.ilist)
-	if count > _MAX_NODE_COUNT {
+	if count > _MAX_ELEMENT_COUNT {
 		return ErrSizeOverflow
 	}
 	p.count = uint16(count)
@@ -111,6 +111,34 @@ func (n *node) writeTo(p *page) (err error) {
 
 			copy(buf, ni.key)
 			buf = buf[el[i].ksize:]
+		}
+	}
+
+	return
+}
+
+func (n0 *node) deepCopy() (n *node) {
+	n = &node{
+		pgid:   n0.pgid,
+		parent: n0.parent,
+		isLeaf: n0.isLeaf,
+	}
+
+	l := len(n0.ilist)
+	n.ilist = make([]*inode, l, l)
+	for i := 0; i < l; i++ {
+		ksize, vsize := len(n0.ilist[i].key), len(n0.ilist[i].value)
+		n.ilist[i] = &inode{
+			pgid:  n0.ilist[i].pgid,
+			key:   make([]byte, ksize, ksize),
+			value: make([]byte, vsize, vsize),
+		}
+
+		if ksize > 0 {
+			copy(n.ilist[i].key, n0.ilist[i].key)
+		}
+		if vsize > 0 {
+			copy(n.ilist[i].value, n0.ilist[i].value)
 		}
 	}
 
