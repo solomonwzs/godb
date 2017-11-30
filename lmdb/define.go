@@ -8,11 +8,6 @@ import (
 const (
 	_VERSION = 1
 
-	_PAGE_FLAG_BRANCH   = 0x01
-	_PAGE_FLAG_LEAF     = 0x02
-	_PAGE_FLAG_META     = 0x04
-	_PAGE_FLAG_FREELIST = 0x08
-
 	_INITIAL_MMAP_SIZE = 0
 
 	_SIZE_32K = 32 * 1024

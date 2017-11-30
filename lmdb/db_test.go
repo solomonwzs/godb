@@ -6,6 +6,7 @@ import (
 	"syscall"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 func TestBase(t *testing.T) {
@@ -48,5 +49,36 @@ func TestMMAP(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fmt.Println(mmap)
+	debugln(mmap)
+}
+
+func TestNode(t *testing.T) {
+	buf := make([]byte, 1024, 1024)
+	p := (*page)(unsafe.Pointer(&buf[0]))
+
+	n := &node{
+		pgid:   123,
+		parent: nil,
+		ilist:  make([]*inode, 3, 3),
+		isLeaf: true,
+	}
+
+	for i := 0; i < len(n.ilist); i++ {
+		n.ilist[i] = &inode{
+			pgid:  pageid(i),
+			key:   []byte(fmt.Sprintf("key-%d", i)),
+			value: []byte(fmt.Sprintf("value-%d", i)),
+		}
+	}
+	n.writeTo(p)
+
+	n1 := new(node)
+	err := n1.readFrom(p)
+	debugln(unsafe.Pointer(&buf[0]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, _ := range n1.ilist {
+		debugln(n1.ilist[i])
+	}
 }

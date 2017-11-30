@@ -1,6 +1,21 @@
 package lmdb
 
-import "unsafe"
+import (
+	"unsafe"
+)
+
+const (
+	_PAGE_FLAG_UNKNOWN  = 0x00
+	_PAGE_FLAG_BRANCH   = 0x01
+	_PAGE_FLAG_LEAF     = 0x02
+	_PAGE_FLAG_META     = 0x04
+	_PAGE_FLAG_FREELIST = 0x08
+
+	_LEAF_ELEM_SIZE   = int(unsafe.Sizeof(leafElem{}))
+	_BRANCH_ELEM_SIZE = int(unsafe.Sizeof(branchElem{}))
+
+	_MAX_NODE_COUNT = 0xffff
+)
 
 type pageid uint64
 
@@ -32,7 +47,7 @@ func (p *page) getMeta() *meta {
 }
 
 func (p *page) getLeafElems() []leafElem {
-	if p.flags != _PAGE_FLAG_LEAF || p.count == 0 {
+	if p.count == 0 {
 		return nil
 	}
 	return (*[_MAX_ELEMENT_COUNT]leafElem)(
@@ -40,7 +55,7 @@ func (p *page) getLeafElems() []leafElem {
 }
 
 func (p *page) getBranchElems() []branchElem {
-	if p.flags != _PAGE_FLAG_BRANCH || p.count == 0 {
+	if p.count == 0 {
 		return nil
 	}
 	return (*[_MAX_ELEMENT_COUNT]branchElem)(
@@ -50,17 +65,33 @@ func (p *page) getBranchElems() []branchElem {
 func (e *leafElem) key() []byte {
 	buf := (*[_MAX_ALLOC_SIZE]byte)(unsafe.Pointer(e))
 	return (*[_MAX_ALLOC_SIZE]byte)(
-		unsafe.Pointer(&buf[e.pos]))[:e.ksize:e.ksize]
+		unsafe.Pointer(&buf[e.pos]))[:e.ksize]
 }
 
 func (e *leafElem) value() []byte {
 	buf := (*[_MAX_ALLOC_SIZE]byte)(unsafe.Pointer(e))
 	return (*[_MAX_ALLOC_SIZE]byte)(
-		unsafe.Pointer(&buf[e.pos]))[e.ksize : e.ksize+e.vsize : e.vsize]
+		unsafe.Pointer(&buf[e.pos]))[e.ksize : e.ksize+e.vsize]
+}
+
+func (e *leafElem) toINode() (n *inode) {
+	return &inode{
+		pgid:  0,
+		key:   e.key(),
+		value: e.value(),
+	}
 }
 
 func (e *branchElem) key() []byte {
 	buf := (*[_MAX_ALLOC_SIZE]byte)(unsafe.Pointer(e))
 	return (*[_MAX_ALLOC_SIZE]byte)(
 		unsafe.Pointer(&buf[e.pos]))[:e.ksize:e.ksize]
+}
+
+func (e *branchElem) toINode() (n *inode) {
+	return &inode{
+		pgid:  e.pgid,
+		key:   e.key(),
+		value: nil,
+	}
 }

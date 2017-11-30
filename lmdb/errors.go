@@ -9,4 +9,5 @@ var (
 	ErrFileSizeTooSmall = errors.New("lmdb: file size too small")
 	ErrBytesLen         = errors.New("lmdb: bytes length")
 	ErrPageFlags        = errors.New("lmdb: page flags error")
+	ErrSizeOverflow     = errors.New("lmdb: size overflow")
 )
