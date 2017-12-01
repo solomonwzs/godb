@@ -74,7 +74,6 @@ func TestNode(t *testing.T) {
 
 	n1 := new(node)
 	err := n1.readFrom(p)
-	debugln(unsafe.Pointer(&buf[0]))
 	if err != nil {
 		t.Fatal(err)
 	}
